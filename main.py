@@ -1,4 +1,7 @@
 import cv2
+import csv
+import re
+from datetime import datetime
 
 from ultralytics import YOLO
 import supervision as sv
@@ -18,6 +21,11 @@ def main():
 
     reader = easyocr.Reader(["en"], gpu=False)
     allowlist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+    regex = "([A-Z]{1,3})(\d{1,4})([A-Z]{0,3})$"
+
+    fieldnames = ["license-plate", "score", "datetime"]
+    listed_license = []
+    datas = []
 
     while True:
         ret, frame = cap.read()
@@ -31,16 +39,15 @@ def main():
 
             license_plate_crop = frame[int(y1) : int(y2), int(x1) : int(x2), :]
 
-            # license_plate_crop_gray = cv2.cvtColor(
-            #     license_plate_crop, cv2.COLOR_BGR2GRAY
-            # )
+            license_plate_crop_gray = cv2.cvtColor(
+                license_plate_crop, cv2.COLOR_BGR2GRAY
+            )
 
             text_detections = reader.readtext(
-                license_plate_crop, paragraph=True, allowlist=allowlist, detail=0
+                license_plate_crop_gray, paragraph=True, allowlist=allowlist, detail=0
             )
             try:
                 for text in text_detections:
-                    print(text)
                     text = text.replace(" ", "")
                     count = 0
                     for i, c in enumerate(text[::-1]):
@@ -51,6 +58,20 @@ def main():
                         else:
                             break
                     labels.append(f"{text[:-count]} {score:0.2f}")
+
+                    if re.match(regex, text[:-count]):
+                        if text[:-count] not in listed_license:
+                            listed_license.append(text[:-count])
+                            datas.append(
+                                {
+                                    "license-plate": text[:-count],
+                                    "score": score,
+                                    "datetime": datetime.now().strftime(
+                                        "%d/%m/%Y, %H:%M:%S"
+                                    ),
+                                }
+                            )
+
             except:
                 labels.append("Cannot read the plate")
 
@@ -59,6 +80,10 @@ def main():
         cv2.imshow("plate-cam", frame)
 
         if cv2.waitKey(30) == 27:
+            with open("datas.csv", "w", encoding="UTF8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(datas)
             break
 
 
