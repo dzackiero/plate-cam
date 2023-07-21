@@ -42,9 +42,11 @@ def main():
             license_plate_crop_gray = cv2.cvtColor(
                 license_plate_crop, cv2.COLOR_BGR2GRAY
             )
+            bfilter = cv2.bilateralFilter(license_plate_crop_gray, 11, 17, 17)
+            # edged = cv2.Canny(bfilter, 30, 200)
 
             text_detections = reader.readtext(
-                license_plate_crop_gray, paragraph=True, allowlist=allowlist, detail=0
+                bfilter, paragraph=True, allowlist=allowlist, detail=0
             )
             try:
                 for text in text_detections:
